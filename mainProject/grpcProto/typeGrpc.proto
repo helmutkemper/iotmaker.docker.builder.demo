@@ -2,20 +2,20 @@
 
 syntax = "proto3";
 
-option go_package = "github.com/helmutkemper/iotmaker.docker.builder.demo;demo";
+option go_package = "github.com/helmutkemper/iotmaker.docker.builder.demo;grpcProto";
 option java_multiple_files = true;
 option java_package = "io.grpc.iotmaker.docker.builder.demo";
-option java_outer_classname = "demo";
+option java_outer_classname = "grpcProto";
 
 package demo;
 
 message Empty{}
 
 message InstanceIsReadyReplay{
-  bool Ready = 1;
+  bool IsReady = 1;
 }
 
-service SyncCacheDaraServer {
-  rpc grpcFuncPodIsReady(Empty) returns (InstanceIsReadyReplay) {}
+service SyncInstances {
+  rpc grpcFuncInstanceIsReady(Empty) returns (InstanceIsReadyReplay) {}
   rpc grpcFuncCommunication(Empty) returns (Empty) {}
 }
