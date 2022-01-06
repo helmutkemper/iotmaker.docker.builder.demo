@@ -1,0 +1,59 @@
+# (en) first stage of the process
+# (pt) primeira etapa do processo
+FROM cache:latest as builder
+#
+#
+# (en) Add open ssl to alpine
+# (pr) Adiciona o open ssl ao apine
+RUN apk add openssh && \
+    # (en) creates the .ssh directory within the root directory
+    # (pt) cria o diretório .ssh dentro do diretório root
+    mkdir -p /root/.ssh/ && \
+    # (en) prepares the OS for installation
+    # (pt) prepara o OS para instalação
+    apk update && \
+    # (en) install binutils, file, gcc, g++, make, libc-dev, fortify-headers and patch
+    # (pt) instala binutils, file, gcc, g++, make, libc-dev, fortify-headers e patch
+    apk add --no-cache build-base && \
+    # (en) install git, fakeroot, scanelf, openssl, apk-tools, libc-utils, attr, tar, pkgconf, patch, lzip, curl, 
+    #      /bin/sh, so:libc.musl-x86_64.so.1, so:libcrypto.so.1.1 and so:libz.so.1
+    # (pt) instala git, fakeroot, scanelf, openssl, apk-tools, libc-utils, attr, tar, pkgconf, patch, lzip, curl, 
+    #      /bin/sh, so:libc.musl-x86_64.so.1, so:libcrypto.so.1.1 e so:libz.so.1
+    apk add --no-cache alpine-sdk && \
+    # (en) clear the cache
+    # (pt) limpa a cache
+    rm -rf /var/cache/apk/*
+#
+# (en) creates the /app directory, where your code will be installed
+# (pt) cria o diretório /app, onde seu código vai ser instalado
+WORKDIR /app
+# (en) copy your project into the /app folder
+# (pt) copia seu projeto para dentro da pasta /app
+COPY . .
+# (en) enables the golang compiler to run on an extremely simple OS, scratch
+# (pt) habilita o compilador do golang para rodar em um OS extremamente simples, o scratch
+ARG CGO_ENABLED=0
+# (en) adjust git to work with shh
+# (pt) ajusta o git para funcionar com shh
+RUN git config --global url.ssh://git@github.com/.insteadOf https://github.com/
+# (en) install the dependencies in the go.mod file
+# (pt) instala as dependências no arquivo go.mod
+RUN go mod tidy
+# (en) compiles the main.go file
+# (pt) compila o arquivo main.go
+RUN go build -ldflags="-w -s" -o /app/main /app/main.go
+# (en) creates a new scratch-based image
+# (pt) cria uma nova imagem baseada no scratch
+# (en) scratch is an extremely simple OS capable of generating very small images
+# (pt) o scratch é um OS extremamente simples capaz de gerar imagens muito reduzidas
+# (en) discarding the previous image erases git access credentials for your security and reduces the size of the 
+#      image to save server space
+# (pt) descartar a imagem anterior apaga as credenciais de acesso ao git para a sua segurança e reduz o tamanho 
+#      da imagem para poupar espaço no servidor
+FROM scratch
+# (en) copy your project to the new image
+# (pt) copia o seu projeto para a nova imagem
+COPY --from=builder /app/main .
+# (en) execute your project
+# (pt) executa o seu projeto
+CMD ["/main"]

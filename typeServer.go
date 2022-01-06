@@ -1,16 +1,10 @@
-package main
+package iotmakerdockerbuilderdemo
 
 import (
-	"context"
-	"fmt"
 	"github.com/hashicorp/memberlist"
-	"github.com/helmutkemper/iotmaker.docker.builder.demo/grpcProto"
 	"github.com/helmutkemper/util"
-	"google.golang.org/grpc"
-	"io/ioutil"
 	"log"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,17 +13,21 @@ import (
 const (
 	//kSyncBetweenPodsInterval
 	//
-	// English: Synchronism interval between instances.
-	// The break occurs to prevent the flow of data between instances occupying the network and preventing the communication of other services.
+	// English:
 	//
-	// Português: Intervalo de sincronismo entre instâncias.
-	// O intervalo ocorre para evitar que o fluxo de dados entre instâncias ocupe a rede e impeça a comunicação dos demais serviços.
+	// Synchronism interval between instances.
+	// The interval serves to prevent the flow of data between instances occupying the network and
+	// preventing the communication of other services.
+	//
+	// Português:
+	//
+	// Intervalo de sincronismo entre instâncias.
+	// O intervalo serve para evitar que o fluxo de dados entre instâncias ocupe a rede e impeça a
+	// comunicação dos demais serviços.
 	kSyncBetweenPodsInterval = time.Second * 1
 )
 
 type Server struct {
-	grpcProto.UnimplementedSyncInstancesServer
-
 	thisInstanceIsReady        bool
 	thisNodeAddress            string
 	syncPort                   int
@@ -39,27 +37,39 @@ type Server struct {
 	nodeNamesList              *sync.Map
 }
 
+// AddServersByName
+//
+// English:
+//
+//  Adds a new instance by the name of the service/container.
+//
+//
+// Português:
+//
+//  Adiciona uma nova instância pelo nome do container/serviço.
 func (e *Server) AddServersByName(servers ...string) {
 	e.serviceNameList = append(e.serviceNameList, servers...)
 }
 
-func (e *Server) ServicesDiscoverDefaultLocalConfig() *memberlist.Config {
-	conf := memberlist.DefaultLANConfig()
-	conf.TCPTimeout = time.Second
-	conf.IndirectChecks = 1
-	conf.RetransmitMult = 2
-	conf.SuspicionMult = 3
-	conf.PushPullInterval = 15 * time.Second
-	conf.ProbeTimeout = 200 * time.Millisecond
-	conf.ProbeInterval = time.Second
-	conf.GossipInterval = 100 * time.Millisecond
-	conf.GossipToTheDeadTime = 15 * time.Second
-	conf.LogOutput = ioutil.Discard
-	conf.Logger = nil
-
-	return conf
-}
-
+// ipAddressClear
+//
+// English:
+//
+//  Returns only the IPV4 address
+//
+//  The IP address is given in X.X.X.X.X:PORT format and this function only returns the X.X.X.X address
+//
+//   Output:
+//     address: IPV4 address in X.X.X.X format
+//
+// Português:
+//
+//  Retorna apenas o endereço IPV4
+//
+//  O endereço IP é dado no formato X.X.X.X:PORT e esta função retorna apenas o endereço X.X.X.X
+//
+//   Saída:
+//     address: endereço IPV4 no formato X.X.X.X
 func (e *Server) ipAddressClear(address string) (IP string) {
 	if strings.Split(address, ":")[0] == "" {
 		return
@@ -68,6 +78,27 @@ func (e *Server) ipAddressClear(address string) (IP string) {
 	return
 }
 
+// getAndUpdateThisInstanceAddress
+//
+// English:
+//
+//  Updates the current address of the container
+//
+//  The server address may change when the container is restarted
+//
+//   Output:
+//     IP: Container IPV4 address
+//     ready: true if the container is ready to receive requests
+//
+// Português:
+//
+//  Atualiza o endereço atual do container
+//
+//  O endereço do servidor pode mudar quando o container é reiniciado
+//
+//   Saída:
+//     IP: endereço IPV4 do container
+//     ready: true se o container está pronto para receber requisições
 func (e *Server) getAndUpdateThisInstanceAddress() (IP string, ready bool) {
 	var thisNode = e.memberList.LocalNode()
 	IP = e.ipAddressClear(thisNode.Addr.String())
@@ -76,15 +107,11 @@ func (e *Server) getAndUpdateThisInstanceAddress() (IP string, ready bool) {
 	return
 }
 
-func (e *Server) Init(syncPort int, config *memberlist.Config, servicesListNames ...string) (err error) {
+func (e *Server) Init(config *memberlist.Config, syncPort int, servicesListNames ...string) (err error) {
 	var ipAddress string
 
 	e.syncPort = syncPort
 	e.AddServersByName(servicesListNames...)
-
-	if config == nil {
-		config = e.ServicesDiscoverDefaultLocalConfig()
-	}
 
 	// inicializa a lista de PODs no service discover
 	e.memberList, err = memberlist.Create(config)
@@ -126,8 +153,6 @@ func (e *Server) Init(syncPort int, config *memberlist.Config, servicesListNames
 				}
 
 				e.thisNodeAddress = ipAddress
-
-				e.dataTransmission()
 			}
 		}
 	}(e)
@@ -167,92 +192,6 @@ func (e *Server) DnsVerifyServices() (err error) {
 		return
 	}
 
-	return
-}
-
-func (e *Server) serverGrpc(ip string) (err error) {
-	var lis net.Listener
-	time.Sleep(2 * time.Second)
-	lis, err = net.Listen("tcp", fmt.Sprintf("%v:%d", ip, e.syncPort))
-	if err != nil {
-		log.Printf("serverGrpc().net.Listen().error: %v", err)
-		return
-	}
-
-	var opts []grpc.ServerOption
-	grpcServer := grpc.NewServer(opts...)
-	grpcProto.RegisterSyncInstancesServer(grpcServer, e)
-	err = grpcServer.Serve(lis)
-	if err != nil {
-		log.Printf("serverGrpc().grpcServer.Serve().error: %v", err)
-		return
-	}
-
-	return
-}
-
-func (e *Server) dataTransmission() {
-	var err error
-	var ipListToSync []string
-	var nodeShutdownList map[string]string
-	var nodeAddedList map[string]string
-	ipListToSync, nodeShutdownList, nodeAddedList = e.getMembersListToSyncDataAndManagerSyncList()
-
-	var conn *grpc.ClientConn
-	var client grpcProto.SyncInstancesClient
-
-	for _, ipAddress := range nodeAddedList {
-		log.Printf("ip address %v has been added", ipAddress)
-	}
-
-	for _, ipAddress := range nodeShutdownList {
-		log.Printf("ip address %v is shunted down", ipAddress)
-	}
-
-	for _, podIpAddress := range ipListToSync {
-		conn, client, err = e.clientGrpcOpen(podIpAddress + ":" + strconv.Itoa(e.syncPort))
-		if err != nil {
-			log.Printf("e.clientGrpcOpen().error: %v", err)
-			return
-		}
-
-		var ctx context.Context
-		var cancelContext context.CancelFunc
-		var ready *grpcProto.InstanceIsReadyReplay
-		ctx, cancelContext = context.WithTimeout(context.Background(), 500*time.Millisecond)
-		ready, err = client.GrpcFuncInstanceIsReady(ctx, &grpcProto.Empty{})
-		cancelContext()
-		if err != nil {
-			e.clientGrpcClose(conn)
-			log.Printf("client.GrpcFuncInstanceIsReady().error: %v", err)
-			continue
-		}
-
-		if ready.GetIsReady() == false {
-			continue
-		}
-
-		ctx, cancelContext = context.WithTimeout(context.Background(), 500*time.Millisecond)
-		_, err = client.GrpcFuncCommunication(ctx, &grpcProto.Empty{})
-		cancelContext()
-		if err != nil {
-			e.clientGrpcClose(conn)
-			log.Printf("client.GrpcFuncCommunication().error: %v", err)
-			continue
-		}
-	}
-
-	return
-}
-
-func (e *Server) clientGrpcOpen(serverAddr string) (conn *grpc.ClientConn, client grpcProto.SyncInstancesClient, err error) {
-	conn, err = grpc.Dial(serverAddr, grpc.WithInsecure())
-	if err != nil {
-		log.Printf("grpc.Dial(%v).error: %v", serverAddr, err)
-		return
-	}
-
-	client = grpcProto.NewSyncInstancesClient(conn)
 	return
 }
 
@@ -316,31 +255,6 @@ func (e *Server) getMembersListToSyncDataAndManagerSyncList() (ipList []string, 
 			log.Printf("bug: o endereço IP do node está variando para o node.name")
 		}
 	}
-
-	return
-}
-
-func (e *Server) clientGrpcClose(conn *grpc.ClientConn) {
-	var err error
-	err = conn.Close()
-	if err != nil {
-		log.Printf("clientGrpcClose().error: %v", err)
-		return
-	}
-
-	return
-}
-
-func (e *Server) grpcFuncInstanceIsReady(context.Context, *grpcProto.Empty) (replay *grpcProto.InstanceIsReadyReplay, err error) {
-	replay = &grpcProto.InstanceIsReadyReplay{
-		IsReady: e.thisInstanceIsReady,
-	}
-
-	return
-}
-
-func (e *Server) GrpcFuncCommunication(context.Context, *grpcProto.Empty) (empty *grpcProto.Empty, err error) {
-	empty = &grpcProto.Empty{}
 
 	return
 }
