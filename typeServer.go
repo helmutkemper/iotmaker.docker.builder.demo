@@ -1,4 +1,4 @@
-package iotmakerdockerbuilderdemo
+package iotmaker_docker_builder_demo
 
 import (
 	"github.com/hashicorp/memberlist"
