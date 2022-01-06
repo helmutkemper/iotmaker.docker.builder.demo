@@ -2,7 +2,7 @@ module instancebase
 
 go 1.17
 
-replace github.com/helmutkemper/iotmaker.docker.builder.demo => /Users/kemper/go/projetos/iotmaker.docker.builder.demo
+//replace github.com/helmutkemper/iotmaker.docker.builder.demo => /Users/kemper/go/projetos/iotmaker.docker.builder.demo
 
 require github.com/helmutkemper/iotmaker.docker.builder.demo v0.0.0-00010101000000-000000000000
 
