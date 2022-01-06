@@ -107,14 +107,14 @@ func (e *Server) getAndUpdateThisInstanceAddress() (IP string, ready bool) {
 	return
 }
 
-func (e *Server) Init(config *memberlist.Config, syncPort int, servicesListNames ...string) (err error) {
+func (e *Server) Init(syncPort int, servicesListNames ...string) (err error) {
 	var ipAddress string
 
 	e.syncPort = syncPort
 	e.AddServersByName(servicesListNames...)
 
 	// inicializa a lista de PODs no service discover
-	e.memberList, err = memberlist.Create(config)
+	e.memberList, err = memberlist.Create(memberlist.DefaultLANConfig())
 	if err != nil {
 		util.TraceToLog()
 		return
