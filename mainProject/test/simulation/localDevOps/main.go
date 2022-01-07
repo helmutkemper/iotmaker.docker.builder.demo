@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	KTotalNumberOfContainersUnderTest = 1
+	KTotalNumberOfContainersUnderTest = 3
 	KImageExpirationTime              = 5 * time.Minute
 	KContainerName                    = "delete_after_test_instance_"
 )
@@ -21,6 +21,7 @@ const (
 func main() {
 	var err error
 	var wg sync.WaitGroup
+	var containerList = make([]*builder.ContainerBuilder, 0)
 
 	err = builder.SaTestDockerInstall()
 	if err != nil {
@@ -41,15 +42,24 @@ func main() {
 	}
 
 	for i := 0; i != KTotalNumberOfContainersUnderTest; i += 1 {
-		go func(i int) {
-			wg.Add(1)
-			err = buildAndRundDockerContainer(KContainerName+strconv.Itoa(i), netDocker, &wg)
+		var container *builder.ContainerBuilder
+		container, err = buildAndRundDockerContainer(KContainerName+strconv.Itoa(i), netDocker)
+		if err != nil {
+			log.Println("Error on buildAndRundDockerContainer")
+			return
+		}
+
+		containerList = append(containerList, container)
+	}
+
+	for _, container := range containerList {
+		err = container.ContainerStartAfterBuild()
+		if err != nil {
 			if err != nil {
-				log.Println("Error on buildAndRundDockerContainer")
+				log.Println("Error on ContainerStartAfterBuild")
 				return
 			}
-		}(i)
-		wg.Wait()
+		}
 	}
 
 	wg.Add(1)
@@ -73,7 +83,7 @@ func createNetwork() (netDocker *dockerNetwork.ContainerBuilderNetwork, err erro
 	return
 }
 
-func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.ContainerBuilderNetwork, wg *sync.WaitGroup) (err error) {
+func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.ContainerBuilderNetwork) (container *builder.ContainerBuilder, err error) {
 	var imageInspect types.ImageInspect
 
 	// English: Mounts an image cache and makes imaging up to 5x faster
@@ -87,7 +97,7 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 		return
 	}
 
-	var container = &builder.ContainerBuilder{}
+	container = &builder.ContainerBuilder{}
 
 	container.SetNetworkDocker(netDocker)
 
@@ -304,7 +314,7 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	// English: Creates and initializes the container based on the created image.
 	//
 	// Português: Cria e inicializa o container baseado na imagem criada.
-	err = container.ContainerBuildAndStartFromImage()
+	err = container.ContainerBuildWithoutStartingItFromImage()
 	if err != nil {
 		log.Printf("error: %v", err.Error())
 		//builder.SaGarbageCollector()
@@ -314,49 +324,47 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	// English: Starts container monitoring at two second intervals. This functionality generates the log and monitors the standard output of the container.
 	//
 	// Português: Inicializa o monitoramento do container com intervalos de dois segundos. Esta funcionalidade gera o log e monitora a saída padrão do container.
-	container.StartMonitor()
+	//container.StartMonitor()
 
 	// English: Gets the event channel pointer inside the container.
 	//
 	// Português: Pega o ponteiro do canal de eventos dentro do container.
-	event := container.GetChaosEvent()
-
-	wg.Done()
+	//event := container.GetChaosEvent()
 
 	// English: Let the example run until a failure happens to terminate the test
 	//
 	// Português: Deixa o exemplo rodar até que uma falha aconteça para terminar o teste
-	for {
-		var pass = false
-		select {
-		case e := <-event:
-			if e.Done == true || e.Error == true || e.Fail == true {
-				pass = true
-
-				fmt.Printf("container name: %v\n", e.ContainerName)
-				fmt.Printf("done: %v\n", e.Done)
-				fmt.Printf("fail: %v\n", e.Fail)
-				fmt.Printf("error: %v\n", e.Error)
-				fmt.Printf("message: %v\n", e.Message)
-
-				break
-			}
-		}
-
-		if pass == true {
-			break
-		}
-	}
+	//for {
+	//	var pass = false
+	//	select {
+	//	case e := <-event:
+	//		if e.Done == true || e.Error == true || e.Fail == true {
+	//			pass = true
+	//
+	//			fmt.Printf("container name: %v\n", e.ContainerName)
+	//			fmt.Printf("done: %v\n", e.Done)
+	//			fmt.Printf("fail: %v\n", e.Fail)
+	//			fmt.Printf("error: %v\n", e.Error)
+	//			fmt.Printf("message: %v\n", e.Message)
+	//
+	//			break
+	//		}
+	//	}
+	//
+	//	if pass == true {
+	//		break
+	//	}
+	//}
 
 	// English: Stop container monitoring.
 	//
 	// Português: Para o monitoramento do container.
-	err = container.StopMonitor()
-	if err != nil {
-		log.Printf("error: %v", err.Error())
-		//builder.SaGarbageCollector()
-		return
-	}
+	//err = container.StopMonitor()
+	//if err != nil {
+	//	log.Printf("error: %v", err.Error())
+	//	//builder.SaGarbageCollector()
+	//	return
+	//}
 
 	// English: Deletes all docker elements with the term `delete` in the name.
 	//
