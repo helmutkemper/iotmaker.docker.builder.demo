@@ -54,7 +54,7 @@ func buildAndRundDockerContainer(containerName string) {
 	// English: Mount a default dockerfile for golang where the `main.go` file and the `go.mod` file should be in the root folder
 	//
 	// Português: Monta um dockerfile padrão para o golang onde o arquivo `main.go` e o arquivo `go.mod` devem está na pasta raiz
-	container.MakeDefaultDockerfileForMe()
+	//container.MakeDefaultDockerfileForMe()
 
 	// English: Name of the new image to be created.
 	//
