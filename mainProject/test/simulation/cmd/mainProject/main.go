@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	demo "github.com/helmutkemper/iotmaker.docker.builder.demo"
 	"log"
 	"sync"
+	"time"
 )
 
 func main() {
@@ -13,6 +15,13 @@ func main() {
 	if err != nil {
 		log.Printf("error: %v", err)
 	}
+
+	timer := time.NewTimer(20 * time.Second)
+	go func() {
+		<-timer.C
+		fmt.Println("chaos enable")
+	}()
+	timer.Stop()
 
 	var wg = &sync.WaitGroup{}
 	wg.Add(1)

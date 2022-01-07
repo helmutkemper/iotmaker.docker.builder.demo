@@ -1,10 +1,12 @@
 package iotmaker_docker_builder_demo
 
 import (
+	"github.com/hashicorp/logutils"
 	"github.com/hashicorp/memberlist"
 	"github.com/helmutkemper/util"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -112,9 +114,16 @@ func (e *Server) Init(syncPort int, servicesListNames ...string) (err error) {
 
 	e.syncPort = syncPort
 	e.AddServersByName(servicesListNames...)
+	filter := &logutils.LevelFilter{
+		Levels:   []logutils.LogLevel{"DEBUG", "WARN", "ERROR"},
+		MinLevel: logutils.LogLevel("WARN"),
+		Writer:   os.Stderr,
+	}
+	log.SetOutput(filter)
 
 	// inicializa a lista de PODs no service discover
-	e.memberList, err = memberlist.Create(memberlist.DefaultLANConfig())
+	var conf = memberlist.DefaultLANConfig()
+	e.memberList, err = memberlist.Create(conf)
 	if err != nil {
 		util.TraceToLog()
 		return

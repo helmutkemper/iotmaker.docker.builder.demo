@@ -6,12 +6,22 @@ import (
 	builder "github.com/helmutkemper/iotmaker.docker.builder"
 	dockerNetwork "github.com/helmutkemper/iotmaker.docker.builder.network"
 	"log"
+	"strconv"
+	"sync"
 	"time"
 )
 
+const (
+	KTotalNumberOfContainersUnderTest = 1
+	KImageExpirationTime              = 5 * time.Minute
+	KContainerName                    = "delete_after_test_instance_"
+)
+
+//go : generate
 func main() {
 	var err error
-	//delete_after_test_instance_0
+	var wg sync.WaitGroup
+
 	err = builder.SaTestDockerInstall()
 	if err != nil {
 		log.Println("Please, start doocker before test")
@@ -30,8 +40,21 @@ func main() {
 		return
 	}
 
-	buildAndRundDockerContainer("delete_after_test_instance_0", netDocker)
-	buildAndRundDockerContainer("delete_after_test_instance_1", netDocker)
+	for i := 0; i != KTotalNumberOfContainersUnderTest; i += 1 {
+		go func(i int) {
+			wg.Add(1)
+			err = buildAndRundDockerContainer(KContainerName+strconv.Itoa(i), netDocker, &wg)
+			if err != nil {
+				log.Println("Error on buildAndRundDockerContainer")
+				return
+			}
+		}(i)
+		wg.Wait()
+	}
+
+	wg.Add(1)
+	wg.Wait()
+
 }
 
 func createNetwork() (netDocker *dockerNetwork.ContainerBuilderNetwork, err error) {
@@ -50,8 +73,7 @@ func createNetwork() (netDocker *dockerNetwork.ContainerBuilderNetwork, err erro
 	return
 }
 
-func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.ContainerBuilderNetwork) {
-	var err error
+func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.ContainerBuilderNetwork, wg *sync.WaitGroup) (err error) {
 	var imageInspect types.ImageInspect
 
 	// English: Mounts an image cache and makes imaging up to 5x faster
@@ -65,9 +87,11 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 		return
 	}
 
-	var container = builder.ContainerBuilder{}
+	var container = &builder.ContainerBuilder{}
 
 	container.SetNetworkDocker(netDocker)
+
+	container.SetImageExpirationTime(KImageExpirationTime)
 
 	// English: print the standard output of the container
 	//
@@ -82,7 +106,7 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	// English: Mount a default dockerfile for golang where the `main.go` file and the `go.mod` file should be in the root folder
 	//
 	// Português: Monta um dockerfile padrão para o golang onde o arquivo `main.go` e o arquivo `go.mod` devem está na pasta raiz
-	//container.MakeDefaultDockerfileForMe()
+	container.MakeDefaultDockerfileForMeWithInstallExtras()
 
 	// English: Name of the new image to be created.
 	//
@@ -152,7 +176,7 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 		// English: Defines the path to the container standard output to be save as text file
 		//
 		// Português: Define o caminho onde a saída padrão do container será salva em formato de arquivo texto
-		"./log1/log2/log3",
+		"./log/restartAfterError",
 	)
 
 	// English: Initializes the container manager object.
@@ -272,8 +296,10 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 		return
 	}
 
+	fmt.Printf("container name: %v\n", containerName)
 	fmt.Printf("image size: %v\n", container.SizeToString(imageInspect.Size))
 	fmt.Printf("image os: %v\n", imageInspect.Os)
+	fmt.Println()
 
 	// English: Creates and initializes the container based on the created image.
 	//
@@ -294,6 +320,8 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	//
 	// Português: Pega o ponteiro do canal de eventos dentro do container.
 	event := container.GetChaosEvent()
+
+	wg.Done()
 
 	// English: Let the example run until a failure happens to terminate the test
 	//
@@ -334,4 +362,6 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	//
 	// Português: Apaga todos os elementos docker com o termo `delete` no nome.
 	//builder.SaGarbageCollector()
+
+	return
 }

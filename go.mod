@@ -3,6 +3,7 @@ module github.com/helmutkemper/iotmaker.docker.builder.demo
 go 1.17
 
 require (
+	github.com/hashicorp/logutils v1.0.0
 	github.com/hashicorp/memberlist v0.3.0
 	github.com/helmutkemper/util v0.0.0-20210420213725-d4fad0e09c93
 	google.golang.org/grpc v1.43.0

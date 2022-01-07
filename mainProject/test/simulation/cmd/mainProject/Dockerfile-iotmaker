@@ -50,7 +50,7 @@ RUN go build -ldflags="-w -s" -o /app/main /app/main.go
 #      image to save server space
 # (pt) descartar a imagem anterior apaga as credenciais de acesso ao git para a sua segurança e reduz o tamanho 
 #      da imagem para poupar espaço no servidor
-FROM cache:latest
+FROM scratch
 # (en) copy your project to the new image
 # (pt) copia o seu projeto para a nova imagem
 COPY --from=builder /app/main .
