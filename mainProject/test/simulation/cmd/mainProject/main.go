@@ -9,7 +9,7 @@ import (
 func main() {
 	var err error
 	var server = &demo.Server{}
-	err = server.Init(1010, "delete_after_test_instance_0")
+	err = server.Init(1010, "10.0.0.2")
 	if err != nil {
 		log.Printf("error: %v", err)
 	}

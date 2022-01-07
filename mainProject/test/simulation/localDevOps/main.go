@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	builder "github.com/helmutkemper/iotmaker.docker.builder"
+	dockerNetwork "github.com/helmutkemper/iotmaker.docker.builder.network"
 	"log"
 	"time"
 )
@@ -39,7 +40,21 @@ func buildAndRundDockerContainer(containerName string) {
 	// Português: Apaga todos os elementos docker com o termo `delete` no nome.
 	builder.SaGarbageCollector()
 
+	var netDocker = &dockerNetwork.ContainerBuilderNetwork{}
+	err = netDocker.Init()
+	if err != nil {
+		panic(err)
+	}
+
+	// create a network named delete_after_test, subnet 10.0.0.0/16 e gatway 10.0.0.1
+	err = netDocker.NetworkCreate("delete_after_test", "10.0.0.0/16", "10.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+
 	var container = builder.ContainerBuilder{}
+
+	container.SetNetworkDocker(netDocker)
 
 	// English: print the standard output of the container
 	//
