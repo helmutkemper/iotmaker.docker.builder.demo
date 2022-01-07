@@ -13,9 +13,9 @@ func main() {
 	var err error
 
 	filter := &logutils.LevelFilter{
-		Levels:   []logutils.LogLevel{"DEBUG", "WARN", "ERROR"},
-		MinLevel: logutils.LogLevel("WARN"),
-		Writer:   os.Stderr,
+		Levels:   []logutils.LogLevel{"[DEBUG]", "[WARN]", "[ERROR]"},
+		MinLevel: logutils.LogLevel("[WARN]"),
+		Writer:   os.Stdout,
 	}
 	log.SetOutput(filter)
 
