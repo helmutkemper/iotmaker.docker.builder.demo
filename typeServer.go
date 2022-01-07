@@ -4,7 +4,6 @@ import (
 	"github.com/hashicorp/memberlist"
 	"github.com/helmutkemper/util"
 	"log"
-	"net"
 	"strings"
 	"sync"
 	"time"
@@ -31,24 +30,14 @@ type Server struct {
 	thisInstanceIsReady        bool
 	thisNodeAddress            string
 	syncPort                   int
-	serviceNameList            []string
+	ipServiceListAsString      []string
 	memberList                 *memberlist.Memberlist
 	syncBetweenInstancesTicker *time.Ticker
 	nodeNamesList              *sync.Map
 }
 
-// AddServersByName
-//
-// English:
-//
-//  Adds a new instance by the name of the service/container.
-//
-//
-// Português:
-//
-//  Adiciona uma nova instância pelo nome do container/serviço.
-func (e *Server) AddServersByName(servers ...string) {
-	e.serviceNameList = append(e.serviceNameList, servers...)
+func (e *Server) AddServersIP(servers ...string) {
+	e.ipServiceListAsString = append(e.ipServiceListAsString, servers...)
 }
 
 // ipAddressClear
@@ -107,11 +96,11 @@ func (e *Server) getAndUpdateThisInstanceAddress() (IP string, ready bool) {
 	return
 }
 
-func (e *Server) Init(syncPort int, servicesListNames ...string) (err error) {
+func (e *Server) Init(syncPort int, servicesIpLoist ...string) (err error) {
 	var ipAddress string
 
 	e.syncPort = syncPort
-	e.AddServersByName(servicesListNames...)
+	e.AddServersIP(servicesIpLoist...)
 
 	// inicializa a lista de PODs no service discover
 	e.memberList, err = memberlist.Create(memberlist.DefaultLANConfig())
@@ -161,31 +150,7 @@ func (e *Server) Init(syncPort int, servicesListNames ...string) (err error) {
 }
 
 func (e *Server) DnsVerifyServices() (err error) {
-	var pass = false
-	var ipServiceList []net.IP
-	var ipServiceListAsString = make([]string, 0)
-
-	for _, serviceName := range e.serviceNameList {
-		ipServiceList, err = net.LookupIP(serviceName)
-		if err == nil {
-			pass = true
-		}
-
-		for _, nodeIP := range ipServiceList {
-			ipServiceListAsString = append(ipServiceListAsString, nodeIP.String())
-		}
-	}
-
-	if pass == false {
-		log.Print("nenhum servidor encontrado")
-		return
-	}
-
-	if len(ipServiceListAsString) == 0 {
-		return
-	}
-
-	_, err = e.memberList.Join(ipServiceListAsString)
+	_, err = e.memberList.Join(e.ipServiceListAsString)
 	if err != nil {
 		log.Printf("e.memberList.Join().error: %v", err)
 		err = nil
