@@ -17,10 +17,40 @@ func main() {
 		log.Println("Please, start doocker before test")
 		return
 	}
-	buildAndRundDockerContainer("delete_after_test_instance_0")
+
+	// English: Deletes all docker elements with the term `delete` in the name.
+	//
+	// Português: Apaga todos os elementos docker com o termo `delete` no nome.
+	builder.SaGarbageCollector()
+
+	var netDocker *dockerNetwork.ContainerBuilderNetwork
+	netDocker, err = createNetwork()
+	if err != nil {
+		log.Println("Error on create network")
+		return
+	}
+
+	buildAndRundDockerContainer("delete_after_test_instance_0", netDocker)
+	buildAndRundDockerContainer("delete_after_test_instance_1", netDocker)
 }
 
-func buildAndRundDockerContainer(containerName string) {
+func createNetwork() (netDocker *dockerNetwork.ContainerBuilderNetwork, err error) {
+	netDocker = &dockerNetwork.ContainerBuilderNetwork{}
+	err = netDocker.Init()
+	if err != nil {
+		panic(err)
+	}
+
+	// create a network named delete_after_test, subnet 10.0.0.0/16 e gatway 10.0.0.1
+	err = netDocker.NetworkCreate("delete_after_test", "10.0.0.0/16", "10.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+
+	return
+}
+
+func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.ContainerBuilderNetwork) {
 	var err error
 	var imageInspect types.ImageInspect
 
@@ -31,25 +61,8 @@ func buildAndRundDockerContainer(containerName string) {
 	err = builder.SaImageMakeCacheWithDefaultName("./mainProject/test/cache/", 365*24*60*60*time.Second)
 	if err != nil {
 		fmt.Printf("error: %v", err.Error())
-		builder.SaGarbageCollector()
+		//builder.SaGarbageCollector()
 		return
-	}
-
-	// English: Deletes all docker elements with the term `delete` in the name.
-	//
-	// Português: Apaga todos os elementos docker com o termo `delete` no nome.
-	builder.SaGarbageCollector()
-
-	var netDocker = &dockerNetwork.ContainerBuilderNetwork{}
-	err = netDocker.Init()
-	if err != nil {
-		panic(err)
-	}
-
-	// create a network named delete_after_test, subnet 10.0.0.0/16 e gatway 10.0.0.1
-	err = netDocker.NetworkCreate("delete_after_test", "10.0.0.0/16", "10.0.0.1")
-	if err != nil {
-		panic(err)
 	}
 
 	var container = builder.ContainerBuilder{}
@@ -148,7 +161,7 @@ func buildAndRundDockerContainer(containerName string) {
 	err = container.Init()
 	if err != nil {
 		fmt.Printf("error: %v", err.Error())
-		builder.SaGarbageCollector()
+		//builder.SaGarbageCollector()
 		return
 	}
 
@@ -245,7 +258,7 @@ func buildAndRundDockerContainer(containerName string) {
 	err = container.Init()
 	if err != nil {
 		fmt.Printf("error: %v", err.Error())
-		builder.SaGarbageCollector()
+		//builder.SaGarbageCollector()
 		return
 	}
 
@@ -255,7 +268,7 @@ func buildAndRundDockerContainer(containerName string) {
 	imageInspect, err = container.ImageBuildFromFolder()
 	if err != nil {
 		fmt.Printf("error: %v", err.Error())
-		builder.SaGarbageCollector()
+		//builder.SaGarbageCollector()
 		return
 	}
 
@@ -268,7 +281,7 @@ func buildAndRundDockerContainer(containerName string) {
 	err = container.ContainerBuildAndStartFromImage()
 	if err != nil {
 		log.Printf("error: %v", err.Error())
-		builder.SaGarbageCollector()
+		//builder.SaGarbageCollector()
 		return
 	}
 
@@ -313,12 +326,12 @@ func buildAndRundDockerContainer(containerName string) {
 	err = container.StopMonitor()
 	if err != nil {
 		log.Printf("error: %v", err.Error())
-		builder.SaGarbageCollector()
+		//builder.SaGarbageCollector()
 		return
 	}
 
 	// English: Deletes all docker elements with the term `delete` in the name.
 	//
 	// Português: Apaga todos os elementos docker com o termo `delete` no nome.
-	builder.SaGarbageCollector()
+	//builder.SaGarbageCollector()
 }
