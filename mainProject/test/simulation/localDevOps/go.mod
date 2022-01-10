@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/docker/docker v20.10.12+incompatible
-	github.com/helmutkemper/iotmaker.docker.builder v0.9.43
+	github.com/helmutkemper/iotmaker.docker.builder v0.9.50
 	github.com/helmutkemper/iotmaker.docker.builder.network v0.0.0-20210517125645-e0b15cc3b594
 )
 

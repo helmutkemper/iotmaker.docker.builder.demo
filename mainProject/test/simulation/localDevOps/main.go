@@ -20,7 +20,6 @@ const (
 //go : generate
 func main() {
 	var err error
-	var wg sync.WaitGroup
 	var containerList = make([]*builder.ContainerBuilder, 0)
 
 	err = builder.SaTestDockerInstall()
@@ -60,11 +59,64 @@ func main() {
 				return
 			}
 		}
+
+		container.StartMonitor()
 	}
 
-	wg.Add(1)
-	wg.Wait()
+	var channelsList = make([]<-chan builder.Event, len(containerList))
+	for _, container := range containerList {
+		var evevt = container.GetChaosEvent()
+		channelsList = append(channelsList, evevt)
+	}
 
+	var globalEvent = merge(channelsList...)
+	for {
+		var pass = false
+		select {
+		case e := <-globalEvent:
+			if e.Done == true || e.Error == true || e.Fail == true {
+				pass = true
+
+				fmt.Printf("container name: %v\n", e.ContainerName)
+				fmt.Printf("done: %v\n", e.Done)
+				fmt.Printf("fail: %v\n", e.Fail)
+				fmt.Printf("error: %v\n", e.Error)
+				fmt.Printf("message: %v\n", e.Message)
+
+				break
+			}
+		}
+
+		if pass == true {
+			break
+		}
+	}
+
+	for _, container := range containerList {
+		container.EnableChaosScene(false)
+		_ = container.StopMonitor()
+	}
+
+	builder.SaGarbageCollector()
+}
+
+func merge(cs ...<-chan builder.Event) <-chan builder.Event {
+	out := make(chan builder.Event)
+	var wg sync.WaitGroup
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go func(c <-chan builder.Event) {
+			for v := range c {
+				out <- v
+			}
+			wg.Done()
+		}(c)
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
 
 func createNetwork() (netDocker *dockerNetwork.ContainerBuilderNetwork, err error) {
@@ -143,9 +195,6 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	// Português: Define o caminho do arquivo de log com dados estatísticos do container
 	container.SetCsvLogPath("./"+containerName+".log.csv", true)
 
-	// English: Defines the separator used in the CSV file
-	//
-	// Português: Define o separador usado no arquivo CSV
 	container.SetCsvFileValueSeparator("\t")
 
 	// English: Adds a search filter to the standard output of the container, to save the information in the log file
@@ -165,7 +214,7 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 		// English: Regular expression used to filter what goes into the log using the `valueToGet` parameter.
 		//
 		// Português: Expressão regular usada para filtrar o que vai para o log usando o parâmetro `valueToGet`.
-		"^.*?counter: (?P<valueToGet>[\\d\\.]+)",
+		"^.*?counter: (?P<valueToGet>[\\d.]+)",
 
 		// English: Regular expression used for search and replacement in the text found in the previous step [optional].
 		//
@@ -186,18 +235,8 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 		// English: Defines the path to the container standard output to be save as text file
 		//
 		// Português: Define o caminho onde a saída padrão do container será salva em formato de arquivo texto
-		"./log/restartAfterError",
+		"./log/"+containerName+"/restartAfterError",
 	)
-
-	// English: Initializes the container manager object.
-	//
-	// Português: Inicializa o objeto gerenciador de container.
-	err = container.Init()
-	if err != nil {
-		fmt.Printf("error: %v", err.Error())
-		//builder.SaGarbageCollector()
-		return
-	}
 
 	// English: Adds a filter to look for a value in the container's standard output indicating the success of the test.
 	//
@@ -223,23 +262,15 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	// English: Adds a filter to look for a value in the container's standard output indicating the fail of the test.
 	//
 	// Português: Adiciona um filtro para procurar um valor na saída padrão do container indicando a falha do teste.
-	container.AddFilterToFail(
-		// English: Simple text searched in the container's standard output to activate the filter
-		//
-		// Português: Texto simples procurado na saída padrão do container para ativar o filtro
-		"counter: 340",
-
-		// English: Regular expression used to filter what goes into the log using the `valueToGet` parameter.
-		//
-		// Português: Expressão regular usada para filtrar o que vai para o log usando o parâmetro `valueToGet`.
-		"^.*?(?P<valueToGet>\\d+/\\d+/\\d+ \\d+:\\d+:\\d+ counter: [\\d\\.]+).*",
-
-		// English: Regular expression used for search and replacement in the text found in the previous step [optional].
-		//
-		// Português: Expressão regular usada para busca e substituição no texto encontrado na etapa anterior [opcional].
-		"(?P<date>\\d+/\\d+/\\d+)\\s+(?P<hour>\\d+:\\d+:\\d+)\\s+counter:\\s+(?P<value>[\\d\\.]+).*",
-		"Test Fail! Counter Value: ${value} - Hour: ${hour} - Date: ${date}",
+	err = container.AddFailMatchFlagToFileLog(
+		"bug:",
+		"./log/"+containerName+"/bug",
 	)
+	if err != nil {
+		fmt.Printf("error: %v", err.Error())
+		//builder.SaGarbageCollector()
+		return
+	}
 
 	// English: Adds a filter to look for a value in the container's standard output releasing the chaos test to be started
 	//
@@ -254,7 +285,7 @@ func buildAndRundDockerContainer(containerName string, netDocker *dockerNetwork.
 	// English: Defines the probability of the container restarting and changing the IP address in the process.
 	//
 	// Português: Define a probalidade do container reiniciar e mudar o endereço IP no processo.
-	container.SetRestartProbability(0.9, 1.0, 1)
+	container.SetRestartProbability(1.0, 1.0, 1)
 
 	// English: Defines a time window used to start chaos testing after container initialized
 	//
